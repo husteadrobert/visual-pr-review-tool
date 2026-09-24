@@ -1,0 +1,769 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="stylesheet" href="../vendor/diff2html.min.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/diff2html@3/bundles/css/diff2html.min.css'">
+<link rel="stylesheet" href="../vendor/hljs-github.min.css" onerror="this.onerror=null;this.href='https://cdn.jsdelivr.net/npm/highlight.js@11/styles/github.min.css'">
+<style>
+:root{--bg:#f6f7f9;--panel:#fff;--line:#e3e6ea;--text:#1f2328;--muted:#6b7280;--accent:#2563eb;--warn:#b45309;--warnbg:#fff7ed;--warnline:#fdba74;--new:#16a34a;--newbg:#f0fdf4;--newline:#86efac;--aff:#d97706;--affbg:#fffbeb;--affline:#fcd34d;--old:#94a3b8}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+[v-cloak]{display:none}
+a{color:var(--accent)}
+header{background:var(--panel);border-bottom:1px solid var(--line);padding:10px 20px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+header h1{font-size:16px;margin:0}
+header .spacer{flex:1}
+.meta,.muted{color:var(--muted)} .small{font-size:12px}
+.strip{background:var(--panel);border-bottom:1px solid var(--line);padding:6px 20px}
+.strip svg,.bigmap svg{max-width:100%;height:auto;display:block}
+.bigmap{background:#fafafa;border:1px solid var(--line);border-radius:8px;padding:12px;margin:6px 0 4px;overflow-x:auto}
+main{display:grid;grid-template-columns:290px minmax(0,1fr) 340px;min-height:calc(100vh - 150px)}
+.timeline{background:var(--panel);border-right:1px solid var(--line);padding:10px;overflow-y:auto}
+.card{background:var(--panel);padding:16px 26px;min-width:0;max-width:980px}
+.state{background:var(--panel);border-left:1px solid var(--line);padding:12px;overflow-y:auto}
+footer{position:sticky;bottom:0;background:var(--panel);border-top:1px solid var(--line);padding:10px 20px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+button{font:inherit;padding:6px 12px;border:1px solid var(--line);background:#fff;border-radius:6px;cursor:pointer}
+button:disabled{opacity:.4;cursor:default}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent)}
+button.warn{background:var(--warnbg);color:var(--warn);border-color:var(--warnline)}
+button.toggle{font-size:12px} button.toggle.on{background:var(--newbg);border-color:var(--newline);color:#166534}
+.row{display:flex;gap:8px;align-items:flex-start;padding:7px 8px;border-radius:6px;cursor:pointer;border:1px solid transparent;border-left:3px solid transparent;margin-bottom:2px}
+.row:hover{background:#f3f4f6}
+.row.active{background:#eef2ff;border-color:#c7d2fe}
+.row.dim{opacity:.45}
+.row.rel-changed{border-left-color:var(--new)}
+.row.rel-affected{border-left-color:var(--aff)}
+.row.rel-context{opacity:.75}
+.row.collapsed{opacity:.75;border:1px dashed var(--line);border-left:3px dashed var(--old)}
+.row .num{min-width:24px;color:var(--muted);font-variant-numeric:tabular-nums;font-size:12px;padding-top:2px}
+.row.branch{margin-left:24px;border-left:3px solid var(--warnline);border-radius:0 6px 6px 0}
+.row.branch.active{background:var(--warnbg);border-color:var(--warnline)}
+.row .title{font-size:13px}
+.badge{display:inline-block;font-size:10px;padding:1px 6px;border-radius:999px;border:1px solid var(--line);color:var(--muted);text-transform:uppercase;letter-spacing:.04em;background:#f8fafc}
+.badge.job{background:#ecfeff;color:#0e7490;border-color:#a5f3fc}
+.badge.service{background:#f0fdf4;color:#15803d;border-color:#bbf7d0}
+.badge.controller,.badge.policy{background:#eef2ff;color:#4338ca;border-color:#c7d2fe}
+.badge.integration,.badge.external{background:#fdf4ff;color:#a21caf;border-color:#f5d0fe}
+.badge.storage,.badge.db,.badge.model{background:#fff7ed;color:#c2410c;border-color:#fed7aa}
+.badge.error{background:var(--warnbg);color:var(--warn);border-color:var(--warnline)}
+.badge.start{background:#111827;color:#fff;border-color:#111827}
+.tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;text-transform:uppercase;letter-spacing:.04em;margin-left:6px;font-weight:600}
+.tag.changed{background:var(--newbg);color:#166534;border:1px solid var(--newline)}
+.tag.affected{background:var(--affbg);color:#92400e;border:1px solid var(--affline)}
+.tag.context{background:#f8fafc;color:var(--muted);border:1px solid var(--line)}
+.ident{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;background:#f1f5f9;border:1px solid var(--line);border-radius:4px;padding:0 5px;margin-right:6px;font-weight:600;color:#334155}
+.chip{display:inline-block;font-size:10px;padding:0 5px;border-radius:4px;border:1px solid var(--line);margin-left:6px;vertical-align:middle;background:#f8fafc;color:var(--muted)}
+.chip.spec{background:#dcfce7;color:#166534;border-color:#86efac}
+.chip.code{background:#dbeafe;color:#1e40af;border-color:#93c5fd}
+.chip.inferred{background:#fef3c7;color:#92400e;border-color:#fcd34d}
+.chip.bad{background:#fee2e2;color:#991b1b;border-color:#fca5a5}
+.anchor{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;color:var(--muted);word-break:break-all}
+.anchor a{color:#4b5563;text-decoration:underline dotted}
+.anchor a:hover{color:var(--accent)}
+.rel{padding:9px 12px;border-radius:6px;font-size:13.5px;margin:6px 0 4px;border-left:4px solid}
+.rel.changed{background:var(--newbg);border-color:var(--new);color:#14532d}
+.rel.affected{background:var(--affbg);border-color:var(--aff);color:#78350f}
+.rel.context{background:#f8fafc;border-color:var(--old);color:#475569}
+.newcode{border:1px solid var(--newline);border-left:4px solid var(--new);border-radius:6px;overflow:hidden;margin:6px 0 14px}
+.newcode .label{background:var(--newbg);color:#166534;font-size:11px;padding:4px 10px;text-transform:uppercase;letter-spacing:.04em;font-weight:600}
+.newcode .label a{color:#166534;text-transform:none;letter-spacing:0;font-weight:500}
+.oldlabel{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+pre.ctx{background:#fafafa;border:1px solid var(--line);border-left:4px dashed var(--old);border-radius:6px;padding:10px;font-size:12px;line-height:1.4;overflow:auto;max-height:380px;margin:4px 0 14px;color:#374151}
+.counters{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:8px 0 4px}
+.counters div{background:#f6f8fa;border:1px solid var(--line);border-radius:6px;padding:6px;text-align:center;cursor:pointer}
+.counters div:hover{border-color:var(--accent);background:#eef2ff}
+.counters b{display:block;font-size:18px}
+.counters span{font-size:11px;color:var(--muted)}
+h2{font-size:20px;margin:6px 0 8px;line-height:1.3}
+h3{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:18px 0 6px}
+.lead{font-size:15px;margin:0 0 6px}
+ol.walk{padding-left:0;list-style:none;margin:4px 0;counter-reset:w}
+ol.walk li{counter-increment:w;display:flex;gap:10px;padding:8px 10px;border:1px solid var(--line);border-left:3px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer}
+ol.walk li:hover{background:#f3f4f6}
+ol.walk li.changed{border-left-color:var(--new)} ol.walk li.affected{border-left-color:var(--aff)} ol.walk li.context{opacity:.7}
+ol.walk li::before{content:counter(w);min-width:22px;height:22px;border-radius:999px;background:#111827;color:#fff;font-size:12px;display:inline-flex;align-items:center;justify-content:center;margin-top:2px}
+ul.plain{list-style:none;padding:0;margin:0}
+ul.plain li{padding:7px 9px;border:1px solid var(--line);border-radius:6px;margin-bottom:6px;font-size:13px}
+ul.files{margin:0;padding-left:18px} ul.files li{font-size:12px}
+.stateitem{display:flex;gap:10px;align-items:flex-start;padding:7px 10px;border:1px solid var(--line);border-radius:6px;margin-bottom:6px;font-size:13px}
+.skind{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--muted);min-width:38px;padding-top:3px}
+.err{border-left:3px solid var(--warnline);background:var(--warnbg);padding:8px 10px;margin:6px 0;border-radius:0 6px 6px 0;font-size:13px}
+.err.link{cursor:pointer} .err.link:hover{background:#ffedd5}
+label.q{display:flex;gap:8px;align-items:flex-start;padding:5px 0;font-size:13.5px;cursor:pointer}
+label.q input{margin-top:3px}
+details summary{cursor:pointer;color:var(--muted);font-size:12px;margin-top:6px}
+details.spec{border:1px solid var(--line);border-radius:8px;padding:8px 12px;margin-top:10px}
+details.spec summary{font-size:13px;color:var(--text);margin:0;list-style:none;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+details.spec summary::before{content:"▸";color:var(--muted);transition:transform .15s}
+details.spec[open] summary::before{transform:rotate(90deg)}
+details.spec summary::-webkit-details-marker{display:none}
+details.code{background:#fcfcfd}
+.focus{margin:6px 0 0 0;padding-left:18px} .focus li{margin:2px 0}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);flex-wrap:wrap;margin-top:6px}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+.d2h-wrapper{font-size:12px} .d2h-file-header{padding:4px 10px;font-size:12px}
+.kbd{font-family:ui-monospace,Menlo,monospace;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px;background:#f8fafc}
+.modal{position:fixed;inset:0;background:rgba(17,24,39,.45);display:flex;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal-box{background:#fff;border-radius:10px;max-width:1000px;width:100%;max-height:85vh;overflow:auto;padding:16px 20px;box-shadow:0 10px 40px rgba(0,0,0,.25)}
+table.rundown{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+.rundown th,.rundown td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+.rundown th{color:var(--muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+@media (max-width:1150px){main{grid-template-columns:230px minmax(0,1fr)} .state{grid-column:1/-1;border-left:0;border-top:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<div id="app" v-cloak>
+  <header>
+    <h1>PR #{{ pr.number }} · {{ pr.title }}</h1>
+    <span class="meta small">{{ pr.author }} · {{ pr.base }} ← {{ pr.head }} @ {{ shortSha }} · <a :href="pr.url" target="_blank" rel="noopener">{{ t('pr_on_github') }}</a> · <a :href="pr.files_url" target="_blank" rel="noopener">{{ t('files_changed') }}</a></span>
+    <span class="spacer"></span>
+    <button class="toggle" :class="{on: focus}" @click="toggleFocus" :title="focus ? 'Showing changed and affected steps; context steps are collapsed' : 'Showing every step'">
+      {{ focus ? t('focus_on') : t('focus_off') }} · {{ counts.changed }} {{ t('changed') }}, {{ counts.affected }} {{ t('affected') }}, {{ counts.context }} {{ t('context') }}
+    </button>
+    <span class="meta small" v-if="meta.model">{{ t('trace_by') }} {{ meta.model }}<span v-if="meta.cost_usd"> · ${{ Number(meta.cost_usd).toFixed(2) }}</span></span>
+  </header>
+
+  <div class="strip" v-show="mermaidOk && view==='steps'"><div ref="mermaid"></div></div>
+
+  <main>
+    <aside class="timeline">
+      <div v-for="r in timelineRows" :key="r.key" class="row" :class="[{active:r.active, dim:r.dim, branch:r.kind==='branch', collapsed:r.kind==='collapsed'}, r.rel ? 'rel-' + r.rel : '']" @click="r.click()">
+        <span class="num">{{ r.num }}</span>
+        <div style="min-width:0">
+          <span class="badge" :class="r.layer">{{ r.layer }}</span><span v-if="r.rel && r.rel!=='context'" class="tag" :class="r.rel">{{ r.rel }}</span>
+          <div class="title">{{ r.title }}</div>
+          <div v-if="r.sub" class="muted small">{{ r.sub }}</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- OVERVIEW -->
+    <section class="card" v-if="view==='overview'">
+      <span class="badge start">{{ t('start_here') }}</span>
+      <h2>{{ t('what_this_pr_does') }}</h2>
+      <p class="lead">{{ plain.purpose || trace.overview }}</p>
+      <p v-if="plain.purpose && trace.overview && plain.purpose !== trace.overview" class="muted small">{{ trace.overview }}</p>
+      <template v-if="plain.approach"><h3>{{ t('how_it_works') }}</h3><p style="margin:0">{{ plain.approach }}</p></template>
+      <p class="muted small" style="margin:4px 0 0"><b>{{ t('entry_point') }}</b> {{ trace.entry_point }}</p>
+
+      <div class="rel changed" style="margin-top:14px">
+        {{ overviewSummary }}
+      </div>
+
+      <h3>{{ t('whole_flow') }}</h3>
+      <div ref="mermaidBig" class="bigmap" v-show="mermaidOk"></div>
+      <div v-if="!mermaidOk" class="muted small">{{ t('diagram_unavailable') }}</div>
+      <div class="legend"><span><i style="background:#dcfce7;border:1px solid #16a34a"></i>{{ t('legend_changed') }}</span><span><i style="background:#fef3c7;border:1px solid #d97706"></i>{{ t('legend_affected') }}</span><span><i style="background:#f8fafc;border:1px dashed #94a3b8"></i>{{ t('legend_context') }}</span><span><i style="background:#fff7ed;border:1px solid #fdba74"></i>{{ t('legend_branch') }}</span><span class="muted">{{ t('click_any_node') }}</span></div>
+
+      <h3>{{ t('step_by_step') }}</h3>
+      <ol class="walk">
+        <li v-for="(s,i) in mainSteps" :key="s.id" :class="s.relevance" @click="goStep(i)">
+          <div style="min-width:0">
+            <span class="badge" :class="s.layer">{{ s.layer }}</span><span class="tag" :class="s.relevance">{{ s.relevance }}</span> <b>{{ s.title }}</b>
+            <div>{{ (plain.walkthrough && plain.walkthrough[i]) || s.summary }}</div>
+          </div>
+        </li>
+      </ol>
+
+      <template v-if="branches.length || (plain.watch_out && plain.watch_out.length)">
+        <h3>{{ t('where_wrong') }}</h3>
+        <ul class="focus" v-if="plain.watch_out && plain.watch_out.length"><li v-for="w in plain.watch_out">{{ w }}</li></ul>
+        <div v-for="b in branches" :key="b.id" class="err link" @click="enterBranch(b.id)">
+          ⚠ {{ t('at_step') }} {{ b.from_step }} · <b>{{ b.when }}</b>
+          <div class="muted small" style="margin-top:2px">{{ b.summary }} <span>{{ t('click_to_follow') }}</span></div>
+        </div>
+      </template>
+
+      <template v-if="trace.review_focus && trace.review_focus.length">
+        <h3>{{ t('review_time') }}</h3>
+        <ul class="focus"><li v-for="f in trace.review_focus">{{ f }}</li></ul>
+      </template>
+
+      <h3>{{ t('files_changed') }} ({{ pr.files ? pr.files.length : 0 }})</h3>
+      <ul class="files"><li v-for="f in pr.files" :key="f" class="anchor"><a :href="blobUrl(f)" target="_blank" rel="noopener">{{ f }}</a></li></ul>
+
+      <p style="margin-top:18px"><button class="primary" @click="next">{{ t('start_first_changed') }}</button> <button @click="focus=false; next()" style="margin-left:6px">{{ t('walk_every') }}</button></p>
+    </section>
+
+    <!-- STEP -->
+    <section class="card" v-else>
+      <div v-if="mode==='branch' && currentBranch" class="err">
+        ⚠ {{ t('error_branch_from') }} {{ currentBranch.from_step }} · <b>{{ currentBranch.when }}</b>
+        <div class="muted small" style="margin-top:2px">{{ currentBranch.summary }}</div>
+        <button @click="exitBranch" style="margin-top:6px">{{ t('back_main') }}</button>
+      </div>
+
+      <span class="badge" :class="step.layer">{{ step.layer }}</span><span class="tag" :class="step.relevance">{{ step.relevance }}</span>
+      <h2>{{ step.id }}. {{ step.title }}</h2>
+      <div class="rel" :class="step.relevance">
+        <b v-if="step.relevance==='changed'">{{ t('rel_changed') }}</b>
+        <b v-else-if="step.relevance==='affected'">{{ t('rel_affected') }}</b>
+        <b v-else>{{ t('rel_context') }}</b>
+        {{ step.why_it_matters || (step.relevance==='changed' ? t('rel_changed_fb') : t('rel_context_fb')) }}
+      </div>
+
+      <h3>{{ t('what_happens') }}</h3>
+      <p class="lead">{{ step.summary }}</p>
+      <div class="anchor" v-if="step.anchor">
+        <a v-if="anchorUrl" :href="anchorUrl" target="_blank" rel="noopener">{{ step.anchor.file }}:{{ step.anchor.line }}</a><span v-else>{{ step.anchor.file }}:{{ step.anchor.line }}</span>
+        <span v-if="step.anchor.verified===false" class="chip bad">{{ t('anchor_missing') }}</span>
+        <span v-else-if="step.unverified && step.unverified.length" class="chip bad">{{ step.unverified.length }} {{ t('refs_missing') }}</span>
+      </div>
+
+      <h3>{{ t('what_changes') }}</h3>
+      <div v-if="stepStateEmpty" class="muted small">{{ t('nothing_changes') }}</div>
+      <template v-for="sec in stateSections" :key="sec.key">
+        <div v-for="(it, i) in (step.state_after && step.state_after[sec.key]) || []" :key="sec.key + i" class="stateitem">
+          <span class="skind">{{ sec.short }}</span>
+          <div style="min-width:0">
+            <span v-if="identName(sec.key, it)" class="ident">{{ identName(sec.key, it) }}</span><span v-if="isNewRow(sec.key, it) !== null" class="tag" :class="isNewRow(sec.key, it) ? 'changed' : 'context'" style="margin-left:0;margin-right:6px">{{ isNewRow(sec.key, it) ? t('new_row') : t('existing_row') }}</span>
+            {{ sec.fmt(it) }}
+            <span class="chip" :class="it.source">{{ it.source || 'unknown' }}</span>
+            <span v-if="it.evidence_verified===false" class="chip bad">not found</span>
+            <div class="anchor" v-if="it.evidence"><a v-if="evUrl(it.evidence)" :href="evUrl(it.evidence)" target="_blank" rel="noopener">{{ it.evidence }}</a><span v-else>{{ it.evidence }}</span></div>
+          </div>
+        </div>
+      </template>
+
+      <h3>{{ t('if_wrong') }}</h3>
+      <div v-if="!step.error_branches || !step.error_branches.length" class="muted small">{{ t('no_error_handling') }}</div>
+      <div v-for="(e, i) in step.error_branches" :key="i" class="err">
+        <b>{{ e.when }}</b>
+        <span class="chip" :class="e.inherited ? 'inferred' : 'code'">{{ e.inherited ? t('inherited') : t('in_this_code') }}</span>
+        <div style="margin-top:2px">{{ e.then }}</div>
+        <div class="anchor" v-if="e.evidence"><a v-if="evUrl(e.evidence)" :href="evUrl(e.evidence)" target="_blank" rel="noopener">{{ e.evidence }}</a><span v-else>{{ e.evidence }}</span> <span v-if="e.evidence_verified===false" class="chip bad">not found</span></div>
+        <div v-if="e.goto" style="margin-top:6px"><button class="warn" @click="enterBranch(e.goto)">{{ t('follow_branch') }}</button></div>
+      </div>
+
+      <h3>{{ t('ask_yourself') }}</h3>
+      <div v-if="!step.questions || !step.questions.length" class="muted small">{{ t('no_questions') }}</div>
+      <label class="q" v-for="q in step.questions" :key="q"><input type="checkbox" :checked="isChecked(q)" @change="toggle(q)"><span>{{ q }}</span></label>
+
+      <details class="spec code" :open="codeOpen" @toggle="onCodeToggle">
+        <summary>
+          <span>{{ t('see_code') }}</span>
+          <span class="chip code" v-if="step.hunk_texts && step.hunk_texts.length">{{ step.hunk_texts.length }} {{ t('changed_hunks') }}</span>
+          <span class="chip" v-if="step.context_code && step.context_code.length">{{ step.context_code.length }} {{ t('unchanged_blocks') }}</span>
+          <span class="muted small" v-if="codeDefaultOpen && codeOpen">{{ mode==='branch' ? t('open_because_branch') : t('open_because_affected') }}</span>
+        </summary>
+        <div style="margin-top:8px">
+          <template v-if="step.hunk_texts && step.hunk_texts.length">
+            <h3 style="margin-top:6px">{{ t('new_lines') }}</h3>
+            <div class="newcode">
+              <div class="label">{{ t('changed_in_pr') }}<template v-for="h in step.hunk_texts" :key="h.id"> · <a :href="h.github_url" target="_blank" rel="noopener">{{ h.file.split('/').pop() }} {{ t('on_github') }}</a></template></div>
+              <div ref="diff"></div>
+            </div>
+          </template>
+          <div v-else ref="diff"></div>
+          <template v-if="step.context_code && step.context_code.length">
+            <h3>{{ t('existing_code') }}</h3>
+            <div v-for="c in step.context_code" :key="c.file + ':' + c.start">
+              <div class="anchor"><span class="oldlabel">{{ t('unchanged') }}</span> · <a :href="blobUrl(c.file, c.start, c.end)" target="_blank" rel="noopener">{{ c.file }}:{{ c.start }}-{{ c.end }}</a> <span class="muted" v-if="c.why">· {{ c.why }}</span></div>
+              <pre class="ctx">{{ c.text }}</pre>
+            </div>
+          </template>
+          <p v-if="!(step.hunk_texts && step.hunk_texts.length) && !(step.context_code && step.context_code.length)" class="muted small">{{ t('no_code') }}</p>
+        </div>
+      </details>
+
+      <details class="spec" v-if="step.spec_coverage" :open="specOpen" @toggle="specOpen = $event.target.open">
+        <summary>
+          <span>{{ t('spec_coverage') }}</span>
+          <span class="chip" :class="step.spec_coverage.covered ? 'spec' : 'bad'">{{ step.spec_coverage.covered ? t('covered') : t('not_covered') }}</span>
+          <span v-if="step.spec_coverage.gaps && step.spec_coverage.gaps.length" class="chip bad">{{ step.spec_coverage.gaps.length }} {{ t('gaps') }}</span>
+          <span class="muted small" v-if="step.spec_coverage.evidence">· {{ step.spec_coverage.evidence }}</span>
+        </summary>
+        <div style="margin-top:8px;font-size:13px">
+          <template v-if="step.spec_coverage.gaps && step.spec_coverage.gaps.length">
+            <h3 style="margin-top:6px">{{ t('spec_gaps') }}</h3>
+            <ul style="margin:0;padding-left:18px"><li v-for="g in step.spec_coverage.gaps">{{ g }}</li></ul>
+          </template>
+          <template v-if="step.spec_coverage.excerpt">
+            <h3>{{ t('spec_excerpt') }}</h3>
+            <div class="anchor"><a :href="blobUrl(step.spec_coverage.excerpt.file, step.spec_coverage.excerpt.start, step.spec_coverage.excerpt.end)" target="_blank" rel="noopener">{{ step.spec_coverage.excerpt.file }}:{{ step.spec_coverage.excerpt.start }}-{{ step.spec_coverage.excerpt.end }}</a></div>
+            <pre class="ctx">{{ step.spec_coverage.excerpt.text }}</pre>
+          </template>
+          <template v-if="step.spec_coverage.hunk_texts && step.spec_coverage.hunk_texts.length">
+            <h3>{{ t('spec_changes') }}</h3>
+            <div class="newcode"><div class="label">{{ t('changed_in_pr') }}<template v-for="h in step.spec_coverage.hunk_texts" :key="h.id"> · <a :href="h.github_url" target="_blank" rel="noopener">{{ h.file.split('/').pop() }} {{ t('on_github') }}</a></template></div><div ref="specdiff"></div></div>
+          </template>
+          <div v-else ref="specdiff"></div>
+          <p v-if="!step.spec_coverage.excerpt && !(step.spec_coverage.hunk_texts && step.spec_coverage.hunk_texts.length) && !(step.spec_coverage.gaps && step.spec_coverage.gaps.length)" class="muted small">{{ t('no_spec_ref') }}</p>
+        </div>
+      </details>
+    </section>
+
+    <aside class="state">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <h3 style="margin:0">{{ view==='overview' ? t('state_end') : (showCumulative ? t('state_so_far') : t('state_after')) }}</h3>
+        <button v-if="view==='steps'" @click="showCumulative=!showCumulative" class="small">{{ showCumulative ? t('this_step_only') : t('cumulative') }}</button>
+      </div>
+      <div class="counters">
+        <div @click="detail='records'"><b>{{ distinct('records') }}</b><span>{{ t('db_rows') }} · {{ cum.records.length }} {{ t('changes') }}</span></div>
+        <div @click="detail='enqueued_jobs'"><b>{{ distinct('enqueued_jobs') }}</b><span>{{ t('jobs') }} · {{ cum.enqueued_jobs.length }} {{ t('enqueues') }}</span></div>
+        <div @click="detail='external_calls'"><b>{{ cum.external_calls.length }}</b><span>{{ t('ext_calls') }}</span></div>
+        <div @click="detail='files'"><b>{{ cum.files.length }}</b><span>{{ t('files') }}</span></div>
+      </div>
+      <div class="muted small" style="margin-bottom:4px">{{ t('counters_note') }}<span v-if="cum.logs.length"> · <a href="#" @click.prevent="detail='logs'">{{ cum.logs.length }} {{ t('log_lines') }}</a></span></div>
+
+      <template v-if="view==='steps'">
+        <template v-for="sec in stateSections" :key="sec.key">
+          <template v-if="shown[sec.key] && shown[sec.key].length">
+            <h3>{{ sec.label }}</h3>
+            <ul class="plain">
+              <li v-for="(it, i) in shown[sec.key]" :key="sec.key + i">
+                <span v-if="showCumulative && it._step" class="muted small">step {{ it._step }} · </span><span v-if="identName(sec.key, it)" class="ident">{{ identName(sec.key, it) }}</span>{{ sec.fmt(it) }}
+                <span class="chip" :class="it.source">{{ it.source || 'unknown' }}</span>
+                <span v-if="it.evidence_verified===false" class="chip bad">not found</span>
+                <div class="anchor" v-if="it.evidence"><a v-if="evUrl(it.evidence)" :href="evUrl(it.evidence)" target="_blank" rel="noopener">{{ it.evidence }}</a><span v-else>{{ it.evidence }}</span></div>
+              </li>
+            </ul>
+          </template>
+        </template>
+        <div v-if="stateEmpty" class="muted small" style="margin-top:8px">{{ t('nothing_yet') }}</div>
+      </template>
+
+      <template v-if="view==='overview'">
+        <h3>{{ t('before_start') }}</h3>
+        <label class="q" v-for="q in overviewQuestions" :key="q"><input type="checkbox" :checked="isChecked(q)" @change="toggle(q)"><span>{{ q }}</span></label>
+      </template>
+      <template v-else>
+        <details v-if="step.layer_questions && step.layer_questions.length" style="margin-top:14px">
+          <summary>{{ t('general_questions') }} ({{ step.layer }})</summary>
+          <label class="q" v-for="q in step.layer_questions" :key="q"><input type="checkbox" :checked="isChecked(q)" @change="toggle(q)"><span>{{ q }}</span></label>
+        </details>
+      </template>
+    </aside>
+  </main>
+
+  <footer>
+    <button @click="prev" :disabled="view==='overview'">{{ t('prev') }}</button>
+    <span>
+      <template v-if="view==='overview'">{{ t('overview') }}</template>
+      <template v-else>{{ t('step') }} {{ posLabel }}<span v-if="mode==='branch'" class="chip inferred">{{ t('follow') }} {{ branchId }}</span></template>
+      <span class="muted small"> · {{ t('kbd_hint') }}</span>
+    </span>
+    <span>
+      <button v-for="e in followable" :key="e.goto" class="warn" @click="enterBranch(e.goto)">⚠ {{ t('follow') }}: {{ e.when }}</button>
+      <button v-if="mode==='branch'" @click="exitBranch">{{ t('back_main_short') }}</button>
+    </span>
+    <button class="primary" @click="next" :disabled="view==='steps' && atEnd">{{ view==='overview' ? t('start') : t('next') }}</button>
+  </footer>
+
+  <!-- STATE RUNDOWN -->
+  <div v-if="detail" class="modal" @click.self="detail=null">
+    <div class="modal-box">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <h2 style="margin:0">{{ detailLabel }} <span class="muted small">· {{ detailSummary }} · {{ view==='overview' ? 'by the end of the main path' : ('through step ' + step.id) }}</span></h2>
+        <button @click="detail=null">{{ t('close') }}</button>
+      </div>
+      <p class="muted small" style="margin:6px 0 10px">{{ t('modal_note') }}</p>
+      <div v-if="!detailRows.length" class="muted">{{ t('nothing_yet') }}</div>
+      <div v-for="g in detailGroups" :key="g.name || '_'">
+        <h3 v-if="g.name" style="margin-top:14px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span class="ident">{{ g.name }}</span>
+          <span v-if="g.tag" class="tag" :class="g.tag==='new' ? 'changed' : 'context'" style="margin-left:0">{{ g.tag==='new' ? t('new_in_flow') : t('existed_before') }}</span>
+          <span v-if="g.guessed" class="chip inferred" style="margin-left:0">{{ t('name_guessed') }}</span>
+          <span class="muted" style="text-transform:none;letter-spacing:0;font-size:12px">{{ g.sub }} · {{ g.count }} {{ detail==='records' ? t('changes') : t('enqueues') }}</span>
+        </h3>
+        <table class="rundown">
+          <thead><tr><th style="width:120px">{{ t('step') }}</th><th v-for="c in detailColumns" :key="c.label">{{ c.label }}</th><th>{{ t('source') }}</th><th>{{ t('evidence') }}</th></tr></thead>
+          <tbody>
+            <tr v-for="(r, i) in g.rows" :key="i">
+              <td><a href="#" @click.prevent="jumpTo(r)">{{ r._step }}</a><span class="tag" :class="r._rel" v-if="r._rel && r._rel!=='context'">{{ r._rel }}</span><div class="muted small">{{ r._title }}</div></td>
+              <td v-for="c in detailColumns" :key="c.label">{{ c.get(r) }}</td>
+              <td><span class="chip" :class="r.source" style="margin-left:0">{{ r.source || '?' }}</span></td>
+              <td class="anchor"><a v-if="evUrl(r.evidence)" :href="evUrl(r.evidence)" target="_blank" rel="noopener">{{ r.evidence }}</a><span v-else>{{ r.evidence }}</span> <span v-if="r.evidence_verified===false" class="chip bad">not found</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script id="trace" type="application/json">/*__TRACE_JSON__*/</script>
+<script>
+const CDN = {
+  vue: 'https://cdn.jsdelivr.net/npm/vue@3/dist/vue.global.prod.js',
+  d2h: 'https://cdn.jsdelivr.net/npm/diff2html@3/bundles/js/diff2html-ui.min.js',
+  mermaid: 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js'
+};
+function load(srcs) {
+  return new Promise((res, rej) => {
+    const s = document.createElement('script');
+    s.src = srcs[0];
+    s.onload = () => res();
+    s.onerror = () => { s.remove(); srcs.length > 1 ? load(srcs.slice(1)).then(res, rej) : rej(new Error('failed to load ' + srcs[0])); };
+    document.head.appendChild(s);
+  });
+}
+const TRACE = JSON.parse(document.getElementById('trace').textContent);
+
+(async () => {
+  await load(['../vendor/vue.global.prod.js', CDN.vue]);
+  await load(['../vendor/diff2html-ui.min.js', CDN.d2h]).catch(e => console.warn(e));
+  let mermaidOk = false;
+  try { await load(['../vendor/mermaid.min.js', CDN.mermaid]); mermaidOk = !!window.mermaid; } catch (e) { console.warn(e); }
+  boot(mermaidOk);
+})();
+
+const LANG = (TRACE.meta && TRACE.meta.lang) || 'en';
+const L = {
+  en: {},
+  ja: {
+    focus_on: '変更にフォーカス: オン', focus_off: '変更にフォーカス: オフ', changed: '変更', affected: '影響あり', context: '既存',
+    pr_on_github: 'GitHub で PR を開く', files_changed: '変更ファイル', trace_by: '生成:', start_here: 'ここから', what_this_pr_does: 'この PR がやること',
+    how_it_works: '仕組み', entry_point: '起点:', whole_flow: '全体の流れ', legend_changed: 'この PR で変更', legend_affected: 'この PR で挙動が変わる',
+    legend_context: '既存・変更なし', legend_branch: 'エラー分岐', click_any_node: '・ノードをクリックで移動', step_by_step: 'ステップごとの説明（やさしい日本語）',
+    where_wrong: '失敗しうる場所', at_step: 'ステップ', click_to_follow: '・クリックで分岐をたどる', review_time: 'レビューで時間をかけるべき場所',
+    start_first_changed: '最初の変更ステップから始める →', walk_every: 'すべてのステップを見る', error_branch_from: 'エラー分岐（元のステップ', back_main: '← メインの流れに戻る',
+    back_main_short: 'メインの流れに戻る', rel_changed: 'この PR で変更されたコードです。', rel_affected: 'コードは変わっていませんが、この PR の後は挙動が変わります。',
+    rel_context: '既存のコードで、変更はありません。', rel_changed_fb: 'レビュー対象のコードです。', rel_context_fb: '流れを理解するために表示しています。',
+    what_happens: 'ここで起きること', what_changes: 'このステップで変わるもの', nothing_changes: 'このステップでは書き込み・ジョブ登録・外部呼び出しはありません。',
+    if_wrong: 'ここで問題が起きたら', no_error_handling: 'このステップにエラー処理はありません。例外は呼び出し元へ伝わります。', inherited: '継承された挙動',
+    in_this_code: 'このコード内', follow_branch: 'この分岐をたどる →', ask_yourself: '自分に問いかける', no_questions: 'このステップ固有の質問はありません。',
+    see_code: 'コードを見る', changed_hunks: '件の変更ハンク', unchanged_blocks: '件の既存コード', open_because_branch: '・エラー分岐のため自動で開いています',
+    open_because_affected: '・この PR で挙動が変わるため自動で開いています', new_lines: '追加・変更された行', changed_in_pr: 'この PR での変更', on_github: 'を GitHub で開く',
+    existing_code: 'このステップが通る既存コード', unchanged: '変更なし', no_code: 'このステップに紐づくコードはありません。', spec_coverage: 'テストの網羅',
+    covered: 'テストあり', not_covered: 'テストなし', gaps: '件の未カバー', spec_gaps: 'どのテストも通っていない箇所', spec_excerpt: 'このステップを検証しているテスト',
+    spec_changes: 'この PR でのテスト変更', no_spec_ref: 'このステップのテスト参照はありません。', state_end: '最終的な状態', state_so_far: 'ここまでの状態',
+    state_after: 'このステップ後の状態', this_step_only: 'このステップのみ', cumulative: '累積', db_rows: 'DB 行', changes: '件の変更', jobs: 'ジョブ', enqueues: '回の登録',
+    ext_calls: '外部呼び出し', files: 'ファイル', counters_note: 'カウンターは累積です。クリックで一覧を表示します。', log_lines: '件のログ', nothing_yet: 'まだありません。',
+    before_start: '始める前に', general_questions: '一般的な質問', new_row: '新規行', existing_row: '既存行', prev: '← 前へ', overview: '概要', step: 'ステップ',
+    start: '開始 →', next: '次へ →', follow: '分岐', kbd_hint: '移動 ← →、b で分岐、c でコード、esc で戻る', close: '閉じる',
+    modal_note: 'コードとテストからの予測であり、実際の観測ではありません。ステップ番号でジャンプ、根拠のリンクで GitHub を開きます。',
+    new_in_flow: 'この流れで新規作成', existed_before: 'この流れの前から存在', name_guessed: 'モデル名からの推測', source: '根拠の種類', evidence: '根拠',
+    overview_row: '概要: この PR がやること', existing_steps_unchanged: '件の既存ステップ（変更なし）', existing_steps: '件の既存ステップ',
+    records_label: 'DB 行', jobs_label: '登録されたジョブ', calls_label: '外部呼び出し', files_label: 'ファイル', logs_label: 'ログ',
+    col_action: '操作', col_changes: '変更内容', col_args: '引数', col_queue: 'キュー / 遅延', col_target: '宛先', col_via: '経由', col_timeout: 'タイムアウト',
+    col_store: 'ストレージ', col_key: 'キー', col_level: 'レベル', col_message: 'メッセージ',
+    q1: '目的はチケットと一致していますか？スコープが膨らんでいませんか？', q2: 'もっと単純な形にできませんか？',
+    q3: '差分に含まれていないのに影響を受けるものは何ですか？（他のジョブ、このテーブルを読む別の処理、他チーム）',
+    anchor_missing: 'この SHA に該当行がありません', refs_missing: '件の参照先が見つかりません', not_found: '見つかりません', diagram_unavailable: '図を表示できません。'
+  }
+};
+const EN = {
+  focus_on: 'Focus on changes: on', focus_off: 'Focus on changes: off', changed: 'changed', affected: 'affected', context: 'context', pr_on_github: 'PR on GitHub',
+  files_changed: 'Files changed', trace_by: 'trace by', start_here: 'start here', what_this_pr_does: 'What this PR does', how_it_works: 'How it works', entry_point: 'Entry point:',
+  whole_flow: 'The whole flow', legend_changed: 'changed in this PR', legend_affected: 'behaves differently after this PR', legend_context: 'existing, unchanged',
+  legend_branch: 'error branch', click_any_node: '· click any node', step_by_step: 'Step by step, in plain English', where_wrong: 'Where it can go wrong', at_step: 'At step',
+  click_to_follow: '· click to follow', review_time: 'Where to spend review time', start_first_changed: 'Start with the first changed step →', walk_every: 'Walk every step',
+  error_branch_from: 'Error branch from step', back_main: '← Back to main path', back_main_short: 'Back to main path', rel_changed: 'Changed in this PR.',
+  rel_affected: 'Not changed, but it behaves differently after this PR.', rel_context: 'Existing code, unchanged.', rel_changed_fb: 'This is code to review.',
+  rel_context_fb: 'Shown so the path makes sense.', what_happens: 'What happens here', what_changes: 'What changes at this step',
+  nothing_changes: 'Nothing is written, enqueued, or called at this step.', if_wrong: 'If something goes wrong here',
+  no_error_handling: 'No error handling at this step. An exception propagates to the caller.', inherited: 'inherited', in_this_code: 'in this code',
+  follow_branch: 'Follow this branch →', ask_yourself: 'Ask yourself', no_questions: 'No step-specific questions.', see_code: 'See the code', changed_hunks: 'changed hunk(s)',
+  unchanged_blocks: 'unchanged block(s)', open_because_branch: '· open because this step is on an error branch', open_because_affected: '· open because this step behaves differently after this PR',
+  new_lines: 'New and changed lines', changed_in_pr: 'Changed in this PR', on_github: 'on GitHub', existing_code: 'Existing code this step runs through', unchanged: 'unchanged',
+  no_code: 'No code was attached to this step.', spec_coverage: 'Spec coverage', covered: 'covered', not_covered: 'not covered', gaps: 'gap(s)', spec_gaps: 'Not exercised by any spec',
+  spec_excerpt: 'The spec that covers this step', spec_changes: 'Spec changes in this PR', no_spec_ref: 'No spec reference was given for this step.', state_end: 'State at the end',
+  state_so_far: 'State so far', state_after: 'State after this step', this_step_only: 'This step only', cumulative: 'Cumulative', db_rows: 'DB rows', changes: 'change(s)', jobs: 'jobs',
+  enqueues: 'enqueue(s)', ext_calls: 'ext calls', files: 'files', counters_note: 'Counters are cumulative. Click one for the full rundown.', log_lines: 'log line(s)', nothing_yet: 'Nothing yet.',
+  before_start: 'Before you start', general_questions: 'General questions', new_row: 'new row', existing_row: 'existing row', prev: '← Prev', overview: 'Overview', step: 'Step', start: 'Start →',
+  next: 'Next →', follow: 'Follow', kbd_hint: '← → move, b follow a branch, c code, esc back', close: 'Close',
+  modal_note: 'Predicted from code and specs, not observed. Click a step number to jump there, or the evidence to open it on GitHub.', new_in_flow: 'new in this flow',
+  existed_before: 'existed before this flow', name_guessed: 'name guessed from model', source: 'Source', evidence: 'Evidence', overview_row: 'Overview: what this PR does',
+  existing_steps_unchanged: 'existing step(s), unchanged', existing_steps: 'existing step(s)', records_label: 'Database rows', jobs_label: 'Jobs enqueued', calls_label: 'External calls',
+  files_label: 'Files', logs_label: 'Log lines', col_action: 'Action', col_changes: 'Changes', col_args: 'Args', col_queue: 'Queue / delay', col_target: 'Target', col_via: 'Via',
+  col_timeout: 'Timeout', col_store: 'Store', col_key: 'Key', col_level: 'Level', col_message: 'Message', q1: 'Does the purpose match the ticket, and did scope creep in?',
+  q2: 'Is there a simpler shape for this change?', q3: 'What does this touch that is not in the diff (other jobs, other readers of these tables, other teams)?',
+  anchor_missing: 'anchor not found at this SHA', refs_missing: 'reference(s) not found', not_found: 'not found', diagram_unavailable: 'Diagram unavailable.'
+};
+const tr = k => (L[LANG] && L[LANG][k]) || EN[k] || k;
+if (LANG === 'ja') document.documentElement.lang = 'ja';
+
+function boot(mermaidLoaded) {
+  const { createApp } = Vue;
+  const EMPTY = () => ({ records: [], enqueued_jobs: [], external_calls: [], files: [], logs: [] });
+  const fmtChanges = c => c && typeof c === 'object' ? Object.entries(c).map(([k, v]) => k + ' = ' + v).join(', ') : (c || '');
+  const LABELS = { records: tr('records_label'), enqueued_jobs: tr('jobs_label'), external_calls: tr('calls_label'), files: tr('files_label'), logs: tr('logs_label') };
+  const COLS = {
+    records: [{ label: tr('col_action'), get: r => r.action || '' }, { label: tr('col_changes'), get: r => fmtChanges(r.changes) }],
+    enqueued_jobs: [{ label: tr('col_args'), get: r => r.args || '' }, { label: tr('col_queue'), get: r => [r.queue, r.delay].filter(Boolean).join(' · ') }],
+    external_calls: [{ label: tr('col_target'), get: r => r.target || '' }, { label: tr('col_via'), get: r => r.via || '' }, { label: tr('col_timeout'), get: r => r.timeout_s ? r.timeout_s + 's' : '' }],
+    files: [{ label: tr('col_store'), get: r => r.store || '' }, { label: tr('col_action'), get: r => r.action || '' }, { label: tr('col_key'), get: r => [r.bucket, r.key].filter(Boolean).join('/') }],
+    logs: [{ label: tr('col_level'), get: r => r.level || '' }, { label: tr('col_message'), get: r => r.message || '' }]
+  };
+  const REL_STYLE = {
+    changed: 'fill:#dcfce7,stroke:#16a34a,stroke-width:2px,color:#14532d',
+    affected: 'fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f',
+    context: 'fill:#f8fafc,stroke:#94a3b8,stroke-dasharray:4 3,color:#6b7280'
+  };
+  const wrap = (t, n) => { const words = String(t).split(' '); const out = []; let line = ''; for (const w of words) { if ((line + ' ' + w).trim().length > n && line) { out.push(line); line = w; } else line = (line + ' ' + w).trim(); } if (line) out.push(line); return out.join('<br/>'); };
+  const relOf = s => (s && s.relevance) || (s && s.touches_diff ? 'changed' : 'context');
+
+  createApp({
+    data() {
+      return {
+        trace: TRACE, view: 'overview', mode: 'main', branchId: null, idx: 0, showCumulative: true, checks: {}, mermaidOk: mermaidLoaded, detail: null, specOpen: false, codeOverride: null,
+        focus: true, expandedCtx: {},
+        overviewQuestions: [tr('q1'), tr('q2'), tr('q3')],
+        stateSections: [
+          { key: 'records', short: 'DB', label: tr('records_label'), fmt: it => `${it.table || it.model || ''} ${it.action || ''}${it.changes ? ': ' + fmtChanges(it.changes) : ''}` },
+          { key: 'enqueued_jobs', short: 'JOB', label: tr('jobs_label'), fmt: it => `${it.job || ''}${it.delay ? ' after ' + it.delay : ''}${it.queue ? ' on ' + it.queue : ''}${it.args ? ' · ' + it.args : ''}` },
+          { key: 'external_calls', short: 'CALL', label: tr('calls_label'), fmt: it => `${it.target || ''}${it.via ? ' via ' + it.via : ''}${it.timeout_s ? ' · timeout ' + it.timeout_s + 's' : ''}` },
+          { key: 'files', short: 'FILE', label: tr('files_label'), fmt: it => `${it.store || ''} ${it.action || ''} ${it.bucket ? it.bucket + '/' : ''}${it.key || ''}` },
+          { key: 'logs', short: 'LOG', label: tr('logs_label'), fmt: it => `${it.level || 'log'}: ${it.message || ''}` }
+        ]
+      };
+    },
+    computed: {
+      pr() { return this.trace.pr || {}; },
+      meta() { return this.trace.meta || {}; },
+      plain() { return this.trace.plain_english || {}; },
+      shortSha() { return (this.pr.sha || '').slice(0, 10); },
+      mainSteps() { return this.trace.steps || []; },
+      branches() { return this.trace.branches || []; },
+      counts() { const c = { changed: 0, affected: 0, context: 0 }; this.mainSteps.forEach(s => { c[relOf(s)] = (c[relOf(s)] || 0) + 1; }); return c; },
+      anyFocusable() { return this.mainSteps.some(s => relOf(s) !== 'context'); },
+      currentBranch() { return this.branches.find(b => b.id === this.branchId) || null; },
+      path() { return (this.mode === 'branch' && this.currentBranch) ? this.currentBranch.steps : this.mainSteps; },
+      step() { return this.path[this.idx] || this.mainSteps[0] || {}; },
+      anchorUrl() { const a = this.step.anchor; return a ? this.blobUrl(a.file, a.line) : null; },
+      codeDefaultOpen() { return this.mode === 'branch' || relOf(this.step) === 'affected'; },
+      codeOpen() { return this.codeOverride !== null ? this.codeOverride : this.codeDefaultOpen; },
+      stepStateEmpty() { const st = this.step.state_after || {}; return Object.values(st).every(a => !Array.isArray(a) || !a.length); },
+      visibleMain() {
+        return this.mainSteps.map((s, i) => i).filter(i => {
+          const s = this.mainSteps[i];
+          if (!this.focus || !this.anyFocusable) return true;
+          if (relOf(s) !== 'context') return true;
+          if (this.expandedCtx[s.id]) return true;
+          return this.view === 'steps' && this.mode === 'main' && i === this.idx;
+        });
+      },
+      mainGroups() {
+        const groups = []; let run = null; let k = 0;
+        this.mainSteps.forEach((s, i) => {
+          if (this.visibleMain.includes(i)) { run = null; groups.push({ kind: 'step', i }); }
+          else {
+            if (!run) { run = { kind: 'collapsed', k: k++, indices: [], ids: [], titles: [] }; groups.push(run); }
+            run.indices.push(i); run.ids.push(s.id); run.titles.push(s.title);
+          }
+        });
+        return groups;
+      },
+      visibleIdx() { return this.mode === 'branch' ? this.path.map((s, i) => i) : this.visibleMain; },
+      pos() { return this.visibleIdx.indexOf(this.idx); },
+      atEnd() { return this.pos < 0 || this.pos >= this.visibleIdx.length - 1; },
+      posLabel() { const n = this.visibleIdx.length; const focusOn = this.mode === 'main' && n !== this.path.length; const extra = focusOn ? (LANG === 'ja' ? `（表示 ${n} / 全 ${this.path.length}）` : ` of ${n} shown, ${this.path.length} total`) : ` / ${n}`; return `${this.pos + 1}${extra}`; },
+      overviewSummary() {
+        const c = this.counts, n = this.mainSteps.length, b = this.branches.length;
+        if (LANG === 'ja') return `この PR はメインの流れ ${n} ステップのうち ${c.changed} ステップを変更します。` + (c.affected ? `さらに ${c.affected} ステップの挙動が変わります。` : '') + (c.context ? `残りの ${c.context} ステップは流れを理解するための既存コードです。` : '') + (b ? ` たどれるエラー分岐が ${b} 件あります。` : '');
+        return `This PR changes ${c.changed} of ${n} steps on the main path` + (c.affected ? ` and changes the behaviour of ${c.affected} more` : '') + '.' + (c.context ? ` The other ${c.context} are existing code shown so the path makes sense.` : '') + (b ? ` ${b} error branch(es) to follow.` : '');
+      },
+      fromIndex() {
+        if (this.mode !== 'branch' || !this.currentBranch) return this.idx;
+        const i = this.mainSteps.findIndex(s => String(s.id) === String(this.currentBranch.from_step));
+        return i < 0 ? 0 : i;
+      },
+      cum() {
+        const acc = EMPTY();
+        const add = (s, branchId) => {
+          const st = (s && s.state_after) || {};
+          for (const k of Object.keys(acc)) if (Array.isArray(st[k])) st[k].forEach(it => acc[k].push(Object.assign({}, it, { _step: s.id, _title: s.title, _branch: branchId, _rel: relOf(s) })));
+        };
+        if (this.view === 'overview') { this.mainSteps.forEach(s => add(s, null)); return acc; }
+        const upto = this.mode === 'branch' ? this.fromIndex : this.idx;
+        this.mainSteps.slice(0, upto + 1).forEach(s => add(s, null));
+        if (this.mode === 'branch') this.path.slice(0, this.idx + 1).forEach(s => add(s, this.branchId));
+        return acc;
+      },
+      shown() {
+        if (this.showCumulative) return this.cum;
+        const st = this.step.state_after || {}; const o = EMPTY();
+        for (const k of Object.keys(o)) o[k] = Array.isArray(st[k]) ? st[k] : [];
+        return o;
+      },
+      stateEmpty() { return Object.values(this.shown).every(a => !a.length); },
+      followable() { return this.view === 'steps' ? (this.step.error_branches || []).filter(e => e.goto) : []; },
+      detailLabel() { return LABELS[this.detail] || ''; },
+      detailColumns() { return COLS[this.detail] || []; },
+      detailRows() { return this.detail ? (this.cum[this.detail] || []) : []; },
+      identity() { return this.trace.identity || { rows: {}, jobs: {} }; },
+      detailGroups() {
+        const rows = this.detailRows;
+        const groupBy = (keyOf, infoOf, subOf, guessedKey) => {
+          const m = new Map();
+          rows.forEach(r => { const k = keyOf(r); if (!m.has(k)) m.set(k, []); m.get(k).push(r); });
+          return [...m.entries()].map(([k, list]) => { const info = infoOf(k) || {}; return { name: k, sub: subOf(info, list[0]), tag: info.is_new === undefined ? null : (info.is_new ? 'new' : 'existing'), guessed: list.some(x => x[guessedKey]), count: list.length, rows: list }; });
+        };
+        if (this.detail === 'records') return groupBy(r => r.row || r.model || 'unknown', k => this.identity.rows[k], (info, first) => [info.table || first.table, info.model || first.model].filter(Boolean).join(' · '), 'row_guessed');
+        if (this.detail === 'enqueued_jobs') return groupBy(r => r.job_key || r.job || 'unknown', k => this.identity.jobs[k], (info, first) => info.job || first.job || '', 'job_key_guessed');
+        return [{ name: null, rows }];
+      },
+      detailSummary() {
+        const n = this.detailRows.length; const g = this.detailGroups.filter(x => x.name).length;
+        if (this.detail === 'records') return LANG === 'ja' ? `${g} 行, ${n} 件の変更` : `${g} row(s), ${n} change(s)`;
+        if (this.detail === 'enqueued_jobs') return LANG === 'ja' ? `${g} ジョブ, ${n} 回の登録` : `${g} job(s), ${n} enqueue(s)`;
+        return `${n}`;
+      },
+      timelineRows() {
+        const rows = []; const self = this;
+        rows.push({ key: 'ov', kind: 'main', num: '★', layer: 'start', title: tr('overview_row'), active: self.view === 'overview', dim: false, click: () => { self.view = 'overview'; } });
+        this.mainGroups.forEach(g => {
+          if (g.kind === 'collapsed') {
+            rows.push({ key: 'c' + g.k, kind: 'collapsed', num: '…', layer: 'context', title: `${g.indices.length} ${tr('existing_steps_unchanged')}`, sub: g.titles.join(' · '), active: false, dim: false, click: () => self.expandGroup(g) });
+            self.branchesFrom(g.indices).forEach(b => rows.push(self.branchRow(b)));
+            return;
+          }
+          const i = g.i; const s = this.mainSteps[i];
+          rows.push({ key: 'm' + s.id, kind: 'main', num: s.id, layer: s.layer, rel: relOf(s), title: s.title,
+            active: self.view === 'steps' && self.mode === 'main' && i === self.idx, dim: self.view === 'steps' && self.mode === 'branch' && i > self.fromIndex,
+            click: () => self.goStep(i) });
+          self.branchesFrom([i]).forEach(b => {
+            rows.push(self.branchRow(b));
+            const inB = self.view === 'steps' && self.mode === 'branch' && self.branchId === b.id;
+            if (inB) (b.steps || []).forEach((bs, j) => rows.push({ key: 'bs' + bs.id, kind: 'branch', num: bs.id, layer: bs.layer, rel: relOf(bs), title: bs.title, active: j === self.idx, dim: false, click: () => { self.idx = j; } }));
+          });
+        });
+        return rows;
+      }
+    },
+    watch: {
+      step() { this.codeOverride = null; this.$nextTick(() => { this.renderDiff(); this.renderSpecDiff(); this.renderMermaid(); }); },
+      view() { this.$nextTick(() => { this.renderDiff(); this.renderSpecDiff(); this.renderMermaid(); }); },
+      focus() { this.$nextTick(() => this.renderMermaid()); },
+      expandedCtx: { deep: true, handler() { this.$nextTick(() => this.renderMermaid()); } }
+    },
+    methods: {
+      t(k) { return tr(k); },
+      identName(key, it) { if (key === 'records') return it.row || null; if (key === 'enqueued_jobs') return it.job_key || null; return null; },
+      isNewRow(key, it) { if (key !== 'records' || !it.row) return null; const info = this.identity.rows[it.row]; return info && info.is_new !== undefined ? !!info.is_new : null; },
+      distinct(key) { const list = this.cum[key] || []; const names = new Set(list.map(it => this.identName(key, it)).filter(Boolean)); return names.size || list.length; },
+      blobUrl(file, line, end) {
+        if (!this.pr.repo_url || !file) return null;
+        let u = `${this.pr.repo_url}/blob/${this.pr.sha}/${file}`;
+        if (line) { u += `#L${line}`; if (end && String(end) !== String(line)) u += `-L${end}`; }
+        return u;
+      },
+      evUrl(ev) { const m = String(ev || '').match(/^(.+?)(?::(\d+)(?:-(\d+))?)?$/); return m && m[1] && m[1].includes('/') ? this.blobUrl(m[1], m[2], m[3]) : null; },
+      onCodeToggle(e) { this.codeOverride = e.target.open; },
+      branchesFrom(indices) { const ids = indices.map(i => String(this.mainSteps[i].id)); return this.branches.filter(b => ids.includes(String(b.from_step))); },
+      branchRow(b) { const self = this; return { key: 'b' + b.id, kind: 'branch', num: '⚠', layer: 'error', title: b.when, sub: b.summary, active: false, dim: false, click: () => self.enterBranch(b.id) }; },
+      expandGroup(g) { g.ids.forEach(id => { this.expandedCtx[id] = true; }); },
+      toggleFocus() { this.focus = !this.focus; if (this.focus) this.expandedCtx = {}; },
+      nodeFor(i) { for (const g of this.mainGroups) { if (g.kind === 'step' && g.i === i) return 'S' + i; if (g.kind === 'collapsed' && g.indices.includes(i)) return 'C' + g.k; } return null; },
+      mermaidText(dir, highlight) {
+        const esc = t => String(t).replace(/["\[\]<>]/g, "'");
+        const lines = [`graph ${dir}`];
+        let prev = null;
+        this.mainGroups.forEach(g => {
+          let id;
+          if (g.kind === 'step') {
+            const s = this.mainSteps[g.i]; id = 'S' + g.i;
+            lines.push(`${id}["<b>${esc(s.id)}</b> · ${esc(s.layer)}<br/>${wrap(esc(s.title), 26)}"]`);
+            let st = REL_STYLE[relOf(s)] || REL_STYLE.context;
+            if (highlight && this.view === 'steps' && this.mode === 'main' && g.i === this.idx) st += ',stroke:#2563eb,stroke-width:3px';
+            lines.push(`style ${id} ${st}`);
+          } else {
+            id = 'C' + g.k;
+            lines.push(`${id}(["${g.indices.length} ${tr('existing_steps')}<br/>${wrap(esc(g.titles.join(' · ')), 30)}"])`);
+            lines.push(`style ${id} ${REL_STYLE.context}`);
+          }
+          if (prev) lines.push(`${prev}-->${id}`);
+          prev = id;
+        });
+        this.branches.forEach((b, k) => {
+          const i = this.mainSteps.findIndex(s => String(s.id) === String(b.from_step));
+          const from = i < 0 ? null : this.nodeFor(i);
+          if (!from) return;
+          lines.push(`B${k}["⚠ ${wrap(esc(b.when), 26)}"]`);
+          lines.push(`${from}-.->B${k}`);
+          if (highlight && this.mode === 'branch' && this.branchId === b.id) lines.push(`style B${k} fill:#fde68a,stroke:#2563eb,stroke-width:3px`);
+          else lines.push(`style B${k} fill:#fff7ed,stroke:#fdba74`);
+        });
+        return lines.join('\n');
+      },
+      bindMermaidClicks(el) {
+        el.querySelectorAll('.node').forEach(n => {
+          const m = (n.id || '').match(/(?:^|-)([SBC]\d+)(?:-|$)/);
+          if (!m) return;
+          n.style.cursor = 'pointer';
+          n.addEventListener('click', () => this.onNodeClick(m[1]));
+        });
+      },
+      onNodeClick(id) {
+        const t = id[0]; const k = parseInt(id.slice(1), 10);
+        if (t === 'S') this.goStep(k);
+        else if (t === 'B') { const b = this.branches[k]; if (b) this.enterBranch(b.id); }
+        else if (t === 'C') { const g = this.mainGroups.find(g => g.kind === 'collapsed' && g.k === k); if (g) this.expandGroup(g); }
+      },
+      goStep(i) { this.view = 'steps'; this.mode = 'main'; this.branchId = null; this.idx = i; },
+      next() {
+        if (this.view === 'overview') { const first = this.visibleMain.length ? this.visibleMain[0] : 0; this.goStep(first); return; }
+        const vis = this.visibleIdx; const p = vis.indexOf(this.idx);
+        if (p >= 0 && p < vis.length - 1) this.idx = vis[p + 1];
+        else if (p < 0) { const nxt = vis.find(i => i > this.idx); if (nxt !== undefined) this.idx = nxt; }
+      },
+      prev() {
+        if (this.view === 'overview') return;
+        const vis = this.visibleIdx; const p = vis.indexOf(this.idx);
+        if (p > 0) { this.idx = vis[p - 1]; return; }
+        if (p < 0) { const prv = [...vis].reverse().find(i => i < this.idx); if (prv !== undefined) { this.idx = prv; return; } }
+        if (this.mode === 'branch') { this.exitBranch(); return; }
+        this.view = 'overview';
+      },
+      enterBranch(id) {
+        const b = this.branches.find(x => x.id === id);
+        if (!b || !b.steps || !b.steps.length) return;
+        this.view = 'steps'; this.mode = 'branch'; this.branchId = id; this.idx = 0;
+      },
+      exitBranch() { const i = this.fromIndex; this.mode = 'main'; this.branchId = null; this.idx = i; },
+      jumpTo(r) {
+        this.detail = null;
+        if (r._branch) { this.enterBranch(r._branch); const j = this.path.findIndex(s => String(s.id) === String(r._step)); if (j >= 0) this.idx = j; return; }
+        const i = this.mainSteps.findIndex(s => String(s.id) === String(r._step));
+        if (i >= 0) { this.expandedCtx[this.mainSteps[i].id] = true; this.goStep(i); }
+      },
+      drawDiff(el, hunks) {
+        if (!el) return;
+        el.innerHTML = '';
+        if (!hunks || !hunks.length) return;
+        const text = hunks.map(h => h.diff).join('\n');
+        if (!window.Diff2HtmlUI) { const pre = document.createElement('pre'); pre.className = 'ctx'; pre.textContent = text; el.appendChild(pre); return; }
+        try {
+          const ui = new Diff2HtmlUI(el, text, { drawFileList: false, matching: 'lines', outputFormat: 'line-by-line', highlight: true, fileContentToggle: false });
+          ui.draw(); ui.highlightCode();
+        } catch (e) { console.warn('diff2html', e); const pre = document.createElement('pre'); pre.className = 'ctx'; pre.textContent = text; el.appendChild(pre); }
+      },
+      renderDiff() { if (this.view === 'steps') this.drawDiff(this.$refs.diff, this.step.hunk_texts); },
+      renderSpecDiff() { if (this.view === 'steps') this.drawDiff(this.$refs.specdiff, this.step.spec_coverage && this.step.spec_coverage.hunk_texts); },
+      async renderMermaid() {
+        if (!this.mermaidOk || !window.mermaid) return;
+        const jobs = [];
+        if (this.view === 'overview' && this.$refs.mermaidBig) jobs.push([this.$refs.mermaidBig, this.mermaidText('TD', false)]);
+        if (this.view === 'steps' && this.$refs.mermaid) jobs.push([this.$refs.mermaid, this.mermaidText('LR', true)]);
+        for (const [el, text] of jobs) {
+          try { const { svg } = await mermaid.render('ov' + Math.random().toString(36).slice(2), text); el.innerHTML = svg; this.bindMermaidClicks(el); }
+          catch (e) { console.warn('mermaid', e); this.mermaidOk = false; }
+        }
+      },
+      ckey(q) { return `prt:${this.pr.number}:${this.view === 'overview' ? 'overview' : this.step.id}:${q}`; },
+      isChecked(q) { return !!this.checks[this.ckey(q)]; },
+      toggle(q) { const k = this.ckey(q); this.checks[k] = !this.checks[k]; try { localStorage.setItem('prt-checks', JSON.stringify(this.checks)); } catch (e) {} }
+    },
+    mounted() {
+      try { this.checks = JSON.parse(localStorage.getItem('prt-checks') || '{}'); } catch (e) {}
+      if (this.mermaidOk) { try { mermaid.initialize({ startOnLoad: false, theme: 'neutral', securityLevel: 'loose' }); } catch (e) { this.mermaidOk = false; } }
+      window.addEventListener('keydown', e => {
+        if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
+        if (e.key === 'Escape') { if (this.detail) { this.detail = null; return; } if (this.mode === 'branch') this.exitBranch(); return; }
+        if (this.detail) return;
+        if (e.key === 'ArrowRight') this.next();
+        else if (e.key === 'ArrowLeft') this.prev();
+        else if (e.key === 'b' && this.followable.length) this.enterBranch(this.followable[0].goto);
+        else if (e.key === 'f') this.toggleFocus();
+        else if (e.key === 'c' && this.view === 'steps') this.codeOverride = !this.codeOpen;
+      });
+      this.$nextTick(() => { this.renderDiff(); this.renderSpecDiff(); this.renderMermaid(); });
+    }
+  }).mount('#app');
+}
+</script>
+</body>
+</html>

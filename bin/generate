@@ -1,0 +1,544 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+# PR walkthrough generator.
+#
+#   bin/generate 1234                                    # full run: gh + worktree + claude + html
+#   bin/generate 1234 --from-trace .cache/1234/trace_raw.json   # re-render html from a saved trace
+#   bin/generate 1234 --dry-run                          # print the prompt and stop
+#   bin/generate 1234 --offline                          # reuse cached PR metadata and diff
+#
+# Reads the PRT_REPO checkout, never writes to it. Files are read from a detached git
+# worktree at the PR head SHA under .worktrees/<pr>. Remove it with:
+#   git -C "$PRT_REPO" worktree remove .worktrees/<pr>
+
+require 'json'
+require 'open3'
+require 'optparse'
+require 'fileutils'
+require 'time'
+require 'cgi'
+require 'digest'
+
+ROOT = File.expand_path('..', __dir__)
+GH_REPO = ENV.fetch('PRT_GH_REPO', nil)
+ALLOWED_TOOLS = 'Read,Grep,Glob,Bash(git log:*),Bash(git show:*),Bash(git blame:*),Bash(rg:*),Bash(grep:*),Bash(wc:*),Bash(ls:*),Bash(cat:*),Bash(sed:*),Bash(head:*),Bash(tail:*)'
+
+# Judgment questions per layer. Mechanical checks belong to the bots, not here.
+LAYER_QUESTIONS = {
+  'controller' => [
+    'Who calls this endpoint and how often?',
+    'What happens if the client retries this request?',
+    'Does the policy check the resource, not just the caller?'
+  ],
+  'policy' => [
+    'Is the check on the resource the user is touching, or only on the user?',
+    'Which callers skip this policy?'
+  ],
+  'service' => [
+    'If this raises halfway, what is left half-done?',
+    'Is there a transaction, and is its boundary in the right place?'
+  ],
+  'job' => [
+    'If this runs twice with the same arguments, what happens?',
+    'If retry is off, who marks the record failed when the job crashes?',
+    'What piles up if the downstream service is down for an hour?'
+  ],
+  'integration' => [
+    'Is the timeout matched to the provider side?',
+    'Which provider errors become which of our errors?',
+    'Is anything logged here that should not be?'
+  ],
+  'external' => [
+    'What does the provider do on a duplicate request?',
+    'What do we do if the provider is slow rather than down?'
+  ],
+  'storage' => [
+    'Who cleans this object up, and when?',
+    'Can two runs write the same key?'
+  ],
+  'db' => [
+    'Is this table hot enough to need gh-ost?',
+    'Does down truly reverse up?',
+    'Does the code work both before and after the migration runs?'
+  ],
+  'model' => [
+    'Does the schema imply a validation that is missing?',
+    'Is a callback hiding a side effect?'
+  ],
+  'spec' => [
+    'Which branch in this step has no test?',
+    'Is every stub at a real external boundary?'
+  ]
+}.freeze
+
+JA_RULES = <<~RULES
+  # 言語 / Language
+  人間が読む文字列はすべて自然な日本語で書いてください: overview, entry_point, review_focus, plain_english の各項目,
+  各ステップの title, summary, why_it_matters, error_branches の when と then, questions, spec_coverage.gaps,
+  state_after 内の args / changes の値 / message。文体は「です・ます」。入社1か月目のエンジニアが一度読んで
+  分かる平易な言葉で、短い文で書いてください。
+  コード上の識別子はそのまま英語で残してください: クラス名、メソッド名、ファイルパス、カラム名、エラークラス名、
+  HTTP ステータス、キュー名、JSON のキー。JSON のキー名はスキーマ通り英語のままにし、値だけを日本語にします。
+RULES
+
+LAYER_QUESTIONS_JA = {
+  'controller' => ['誰がこのエンドポイントを、どのくらいの頻度で呼びますか？', 'クライアントがこのリクエストを再送したら何が起きますか？', 'ポリシーは呼び出し元だけでなく、対象リソースを確認していますか？'],
+  'policy' => ['チェック対象はユーザーが触るリソースですか、それともユーザーだけですか？', 'このポリシーを通らない呼び出し元はありますか？'],
+  'service' => ['途中で例外が出たら、何が中途半端な状態で残りますか？', 'トランザクションはありますか？その境界は適切ですか？'],
+  'job' => ['同じ引数で2回実行されたら何が起きますか？', 'retry が無効なら、ジョブがクラッシュしたとき誰がレコードを failed にしますか？', '外部サービスが1時間止まったら何が溜まりますか？'],
+  'integration' => ['タイムアウトは相手側の設定と揃っていますか？', '相手側のどのエラーが、こちらのどのエラーになりますか？', 'ログに出してはいけない情報が含まれていませんか？'],
+  'external' => ['相手側は重複リクエストをどう扱いますか？', '相手側が「停止」ではなく「遅い」ときはどうしますか？'],
+  'storage' => ['このオブジェクトは誰が、いつ削除しますか？', '2つの実行が同じキーに書き込む可能性はありますか？'],
+  'db' => ['このテーブルは gh-ost が必要なほど大きいですか？', 'down は up を本当に元に戻しますか？', 'マイグレーション前後のどちらの状態でもコードは動きますか？'],
+  'model' => ['スキーマから見て足りないバリデーションはありますか？', 'コールバックが副作用を隠していませんか？'],
+  'spec' => ['このステップのどの分岐にテストがありませんか？', 'スタブはすべて本当の外部境界に置かれていますか？']
+}.freeze
+
+$prt_lang = 'en'
+$prt_suffix = ''
+
+def log(msg)
+  warn "[generate] #{msg}"
+end
+
+def run!(cmd, chdir: nil, env: {}, stdin: nil)
+  spawn_opts = {}
+  spawn_opts[:chdir] = chdir if chdir
+  spawn_opts[:stdin_data] = stdin if stdin
+  args = [env, *cmd]
+  args << spawn_opts unless spawn_opts.empty?
+  out, err, status = Open3.capture3(*args)
+  abort("[generate] command failed (#{status.exitstatus}): #{cmd.join(' ')}\n#{err}") unless status.success?
+  out
+end
+
+# Split a unified diff into hunks with stable IDs H1..Hn.
+def parse_hunks(patch)
+  hunks = []
+  file = nil
+  cur = nil
+  minus = nil
+  plus = nil
+  patch.each_line do |line|
+    if line.start_with?('diff --git ')
+      file = line[%r{ b/(.+)$}, 1]&.strip
+      cur = nil
+      minus = nil
+      plus = nil
+    elsif line.start_with?('@@ ')
+      cur = { 'id' => "H#{hunks.size + 1}", 'file' => file, 'header' => line.chomp, 'body' => +'', 'minus' => minus, 'plus' => plus }
+      hunks << cur
+    elsif cur
+      cur['body'] << line
+    elsif line.start_with?('--- ')
+      minus = line
+    elsif line.start_with?('+++ ')
+      plus = line
+    end
+  end
+  hunks
+end
+
+# A complete mini unified diff for one hunk, which diff2html can parse on its own.
+def mini_diff(h)
+  minus = h['minus'] || "--- a/#{h['file']}\n"
+  plus  = h['plus']  || "+++ b/#{h['file']}\n"
+  "diff --git a/#{h['file']} b/#{h['file']}\n#{minus}#{plus}#{h['header']}\n#{h['body']}"
+end
+
+def hunk_github_url(files_url, h)
+  start = h['header'].to_s[/(\d+)/, 1]
+  "#{files_url}#diff-#{Digest::SHA256.hexdigest(h['file'].to_s)}#{start ? "R#{start}" : ''}"
+end
+
+def ensure_worktree(repo, pr_number, sha, head_ref)
+  path = File.join(ROOT, '.worktrees', pr_number.to_s)
+  have = lambda { system('git', '-C', repo, 'cat-file', '-e', "#{sha}^{commit}", out: File::NULL, err: File::NULL) }
+  unless have.call
+    log "fetching #{head_ref} from origin"
+    [['git', 'fetch', 'origin', head_ref], ['git', 'fetch', 'origin', sha], ['git', 'fetch', 'origin']].each do |cmd|
+      break if have.call
+      system(*cmd, chdir: repo, out: File::NULL, err: File::NULL)
+    end
+    abort("[generate] commit #{sha} is not reachable from origin") unless have.call
+  end
+  if Dir.exist?(path)
+    current = run!(%w[git rev-parse HEAD], chdir: path).strip
+    if current != sha
+      log "moving worktree to #{sha[0, 10]}"
+      run!(['git', 'checkout', '--detach', sha], chdir: path)
+    end
+  else
+    FileUtils.mkdir_p(File.dirname(path))
+    log "creating worktree at #{sha[0, 10]}"
+    run!(['git', '-C', repo, 'worktree', 'add', '--detach', path, sha])
+  end
+  path
+end
+
+def build_prompt(pr, hunks, sha)
+  template = File.read(File.join(ROOT, 'prompts', 'trace.md'))
+  hunk_index = hunks.map { |h| "#{h['id']}  #{h['file']}  #{h['header']}" }.join("\n")
+  diff_by_hunk = hunks.map { |h| "### #{h['id']} - #{h['file']}\n```diff\n#{h['header']}\n#{h['body']}```" }.join("\n\n")
+  files = pr['files'].map { |f| "- #{f['path']}" }.join("\n")
+  body = pr['body'].to_s.strip
+  vars = {
+    'PR_NUMBER' => pr['number'].to_s,
+    'PR_TITLE' => pr['title'].to_s,
+    'PR_BODY' => (body.empty? ? '(empty)' : body),
+    'BASE' => pr['baseRefName'].to_s,
+    'HEAD' => pr['headRefName'].to_s,
+    'SHA' => sha,
+    'GH_REPO' => GH_REPO,
+    'CHANGED_FILES' => files,
+    'HUNK_INDEX' => hunk_index,
+    'DIFF_BY_HUNK' => diff_by_hunk,
+    'LANGUAGE_RULES' => ($prt_lang == 'ja' ? JA_RULES : '')
+  }
+  template.gsub(/\{\{([A-Z_]+)\}\}/) { vars.fetch(Regexp.last_match(1)) { "{{#{Regexp.last_match(1)}}}" } }
+end
+
+def extract_json(text)
+  t = text.to_s.strip
+  t = t.sub(/\A```(?:json)?\s*/, '').sub(/```\s*\z/, '')
+  s = t.index('{')
+  e = t.rindex('}')
+  raise 'no JSON object found in Claude output' unless s && e && e > s
+  JSON.parse(t[s..e])
+end
+
+def run_claude(prompt, worktree, model, effort, max_turns, cache)
+  env = {
+    'CLAUDECODE' => nil, 'CLAUDE_CODE_ENTRYPOINT' => nil, 'CLAUDE_CODE_CHILD_SESSION' => nil,
+    'CLAUDE_CODE_SESSION_ID' => nil, 'CLAUDE_PID' => nil,
+    'CLAUDE_CODE_EFFORT_LEVEL' => effort, 'CLAUDE_EFFORT' => effort
+  }
+  cmd = ['claude', '-p', '--output-format', 'json', '--max-turns', max_turns.to_s,
+         '--allowedTools', ALLOWED_TOOLS, '--strict-mcp-config', '--mcp-config', '{"mcpServers":{}}']
+  cmd += ['--model', model] if model && !model.empty?
+  cmd += ['--effort', effort] if effort && !effort.empty?
+  log "running claude -p in #{worktree} (model #{model || 'default'}, effort #{effort}; a few minutes)"
+  started = Time.now
+  out, err, status = Open3.capture3(env, *cmd, stdin_data: prompt, chdir: worktree)
+  File.write(File.join(cache, "claude_stdout#{$prt_suffix}.json"), out)
+  File.write(File.join(cache, "claude_stderr#{$prt_suffix}.txt"), err)
+  abort("[generate] claude failed (#{status.exitstatus}); see #{cache}/claude_stderr.txt") unless status.success?
+  res = JSON.parse(out)
+  elapsed = (Time.now - started).round
+  log "claude finished in #{elapsed}s, cost $#{res['total_cost_usd'].to_f.round(2)}, turns #{res['num_turns']}"
+  text = res['result'].to_s
+  File.write(File.join(cache, "claude_result#{$prt_suffix}.txt"), text)
+  trace = extract_json(text)
+  model_used = (res['modelUsage'] || {}).keys.reject { |k| k.include?('haiku') }.first
+  trace['meta'] = {
+    'model' => model_used, 'effort' => effort, 'lang' => $prt_lang, 'cost_usd' => res['total_cost_usd'], 'duration_s' => elapsed,
+    'num_turns' => res['num_turns'], 'session_id' => res['session_id']
+  }
+  trace
+end
+
+def read_lines(worktree, file, start, stop)
+  path = File.join(worktree, file.to_s)
+  return nil unless File.file?(path)
+  lines = File.readlines(path)
+  return nil if lines.empty?
+  s = [[start.to_i, 1].max, lines.size].min
+  e = [[stop.to_i, s].max, lines.size].min
+  e = [e, s + 79].min
+  { 'start' => s, 'end' => e, 'text' => lines[(s - 1)..(e - 1)].join, 'total_lines' => lines.size }
+end
+
+def verify_ref(worktree, file, line)
+  path = File.join(worktree, file.to_s)
+  return false if file.to_s.empty? || !File.file?(path)
+  return true if line.nil?
+  count = File.foreach(path).count
+  line.to_i >= 1 && line.to_i <= count
+end
+
+def parse_evidence(str)
+  m = str.to_s.strip.match(/\A(.+?)(?::(\d+)(?:-(\d+))?)?\z/)
+  return [nil, nil] unless m
+  [m[1], m[2] && m[2].to_i]
+end
+
+def verify_step!(step, worktree)
+  bad = []
+  anchor = step['anchor']
+  if anchor.is_a?(Hash)
+    ok = verify_ref(worktree, anchor['file'], anchor['line'])
+    anchor['verified'] = ok
+    bad << "#{anchor['file']}:#{anchor['line']}" unless ok
+  end
+  walk = lambda do |node|
+    case node
+    when Hash
+      ev = node['evidence']
+      if ev.is_a?(String) && !ev.strip.empty?
+        f, l = parse_evidence(ev)
+        ok = verify_ref(worktree, f, l)
+        node['evidence_verified'] = ok
+        bad << ev unless ok
+      end
+      node.each { |k, v| walk.call(v) unless k == 'anchor' }
+    when Array
+      node.each { |v| walk.call(v) }
+    end
+  end
+  walk.call(step)
+  step['unverified'] = bad.uniq
+end
+
+# Pull the enclosing `it` / `context` block around a spec evidence line, capped at 80 lines.
+def spec_excerpt(worktree, evidence)
+  f, l = parse_evidence(evidence)
+  return nil unless f && l
+  path = File.join(worktree, f)
+  return nil unless File.file?(path)
+  lines = File.readlines(path)
+  return nil if l < 1 || l > lines.size
+  range = evidence.to_s.match(/:(\d+)-(\d+)\z/)
+  if range
+    s = range[1].to_i
+    e = [range[2].to_i, s + 119, lines.size].min
+    return { 'file' => f, 'start' => s, 'end' => e, 'text' => lines[(s - 1)..(e - 1)].join }
+  end
+  opener = /^\s*(it|specify|context|describe|it_behaves_like|include_examples|shared_examples)\b/
+  start = l
+  start -= 1 while start > 1 && lines[start - 1] !~ opener
+  indent = lines[start - 1][/^\s*/].size
+  stop = start
+  loop do
+    stop += 1
+    break if stop >= lines.size || stop >= start + 79
+    line = lines[stop - 1]
+    break if line =~ /^\s*end\b/ && line[/^\s*/].size == indent
+  end
+  stop = [stop, lines.size].min
+  { 'file' => f, 'start' => start, 'end' => stop, 'text' => lines[(start - 1)..(stop - 1)].join }
+end
+
+def enrich_spec_coverage!(step, hunks_by_id, worktree)
+  sc = step['spec_coverage'].is_a?(Hash) ? step['spec_coverage'] : {}
+  sc['covered'] = sc['covered'] ? true : false
+  sc['gaps'] = Array(sc['gaps']).map(&:to_s).reject(&:empty?)
+  sc['hunks'] = Array(sc['hunks']).map(&:to_s)
+  sc['hunk_texts'] = sc['hunks'].map { |id| hunks_by_id[id] }.compact.map do |h|
+    { 'id' => h['id'], 'file' => h['file'], 'header' => h['header'], 'diff' => mini_diff(h), 'github_url' => h['github_url'] }
+  end
+  ev = sc['evidence']
+  sc['excerpt'] = ev.is_a?(String) && !ev.strip.empty? ? spec_excerpt(worktree, ev) : nil
+  step['spec_coverage'] = sc
+end
+
+def enrich_step!(step, hunks_by_id, worktree)
+  enrich_spec_coverage!(step, hunks_by_id, worktree)
+  step['id'] = step['id'].to_s
+  step['hunks'] = Array(step['hunks']).map(&:to_s)
+  step['hunk_texts'] = step['hunks'].map { |id| hunks_by_id[id] }.compact.map do |h|
+    { 'id' => h['id'], 'file' => h['file'], 'header' => h['header'], 'diff' => mini_diff(h), 'github_url' => h['github_url'] }
+  end
+  step['touches_diff'] = !step['hunk_texts'].empty?
+  step['context_code'] = Array(step['context_code']).map do |c|
+    next c unless c.is_a?(Hash)
+    r = read_lines(worktree, c['file'], c['start'], c['end'])
+    r ? c.merge(r) : c.merge('text' => "(file not found at this SHA: #{c['file']})", 'missing' => true)
+  end
+  empty_state = { 'records' => [], 'enqueued_jobs' => [], 'external_calls' => [], 'files' => [], 'logs' => [] }
+  given = step['state_after'].is_a?(Hash) ? step['state_after'] : {}
+  step['state_after'] = empty_state.merge(given) { |_k, _old, new| new.is_a?(Array) ? new : [] }
+  step['error_branches'] = Array(step['error_branches']).select { |e| e.is_a?(Hash) }
+  step['questions'] = Array(step['questions']).map(&:to_s).reject(&:empty?)
+  step['layer_questions'] = ($prt_lang == 'ja' ? LAYER_QUESTIONS_JA : LAYER_QUESTIONS).fetch(step['layer'].to_s, [])
+  rel = step['relevance'].to_s
+  rel = 'changed' if step['touches_diff']
+  rel = 'context' unless %w[changed affected context].include?(rel)
+  step['relevance'] = rel
+  step['why_it_matters'] = step['why_it_matters'].to_s
+  verify_step!(step, worktree)
+end
+
+# Give every record a stable logical row name and every enqueued job a job_key, using Claude's names
+# when present and a model/class based guess otherwise. Builds trace['identity'] with each row's
+# lifecycle across steps and whether this flow created it.
+def assign_identity!(trace)
+  snake = lambda do |str|
+    str.to_s.split('::').last.to_s.gsub(/([a-z\d])([A-Z])/) { "#{Regexp.last_match(1)}_#{Regexp.last_match(2)}" }.downcase
+  end
+  rows = {}
+  jobs = {}
+  ordered = trace['steps'].map { |s| [s, nil] } +
+            trace['branches'].flat_map { |b| b['steps'].map { |s| [s, b['id']] } }
+  ordered.each do |step, branch_id|
+    st = step['state_after']
+    Array(st['records']).each do |r|
+      next unless r.is_a?(Hash)
+      if r['row'].to_s.strip.empty?
+        r['row'] = snake.call(r['model'])
+        r['row_guessed'] = true
+      end
+      key = r['row']
+      rows[key] ||= { 'row' => key, 'model' => r['model'], 'table' => r['table'], 'first_action' => r['action'], 'events' => [] }
+      rows[key]['table'] ||= r['table']
+      rows[key]['events'] << { 'step' => step['id'], 'branch' => branch_id, 'action' => r['action'], 'changes' => r['changes'],
+                               'source' => r['source'], 'evidence' => r['evidence'], 'evidence_verified' => r['evidence_verified'] }
+    end
+    Array(st['enqueued_jobs']).each do |j|
+      next unless j.is_a?(Hash)
+      if j['job_key'].to_s.strip.empty?
+        j['job_key'] = snake.call(j['job'])
+        j['job_key_guessed'] = true
+      end
+      key = j['job_key']
+      jobs[key] ||= { 'job_key' => key, 'job' => j['job'], 'events' => [] }
+      jobs[key]['events'] << { 'step' => step['id'], 'branch' => branch_id, 'args' => j['args'], 'queue' => j['queue'], 'delay' => j['delay'],
+                               'source' => j['source'], 'evidence' => j['evidence'], 'evidence_verified' => j['evidence_verified'] }
+    end
+  end
+  rows.each_value { |r| r['is_new'] = (r['first_action'].to_s == 'created') }
+  trace['identity'] = { 'rows' => rows, 'jobs' => jobs }
+end
+
+def render_html(trace, out_path)
+  template = File.read(File.join(ROOT, 'lib', 'template.html'))
+  # Escape sequences that would end the <script> tag or open an HTML comment, using JSON-valid \u escapes.
+  # Escape '</' and '<!--' as JSON \u003c sequences so the inlined data can never close the <script> block.
+  bs = 92.chr
+  json = JSON.generate(trace).gsub('</') { bs + 'u003c/' }.gsub('<!--') { bs + 'u003c!--' }
+  title = CGI.escapeHTML("PR ##{trace['pr']['number']} - #{trace['pr']['title']}")
+  html = template.sub('__TITLE__') { title }.sub('/*__TRACE_JSON__*/') { json }
+  File.write(out_path, html)
+end
+
+# ---------------------------------------------------------------------------
+
+opts = {
+  repo: ENV.fetch('PRT_REPO', nil), out: File.join(ROOT, 'out'),
+  model: ENV.fetch('PRT_MODEL', 'claude-opus-5'), effort: ENV.fetch('PRT_EFFORT', 'high'),
+  from_trace: nil, dry_run: false, offline: false, max_turns: 80, lang: ENV.fetch('PRT_LANG', 'en')
+}
+parser = OptionParser.new do |o|
+  o.banner = 'Usage: bin/generate PR_NUMBER [options]'
+  o.on('--repo PATH', 'Path to the local checkout of the repo (env PRT_REPO)') { |v| opts[:repo] = File.expand_path(v) }
+  o.on('--out DIR', 'Output directory (default out/)') { |v| opts[:out] = File.expand_path(v) }
+  o.on('--model MODEL', 'Model for claude -p (default claude-opus-5; env PRT_MODEL)') { |v| opts[:model] = v }
+  o.on('--effort LEVEL', 'Thinking effort for claude -p: low|medium|high|xhigh|max (default high; env PRT_EFFORT)') { |v| opts[:effort] = v }
+  o.on('--from-trace FILE', 'Skip Claude; re-render from a saved raw trace JSON') { |v| opts[:from_trace] = File.expand_path(v) }
+  o.on('--max-turns N', Integer, 'Max agent turns for claude -p (default 80)') { |v| opts[:max_turns] = v }
+  o.on('--offline', 'Use cached PR metadata and diff instead of calling gh') { opts[:offline] = true }
+  o.on('--lang LANG', 'Language for all generated text: en or ja (default en; env PRT_LANG)') { |v| opts[:lang] = v }
+  o.on('--dry-run', 'Print the prompt and exit') { opts[:dry_run] = true }
+end
+parser.parse!(ARGV)
+pr_number = ARGV[0] or abort(parser.banner)
+abort('[generate] set PRT_REPO to the local checkout of the repo, or pass --repo PATH') unless opts[:repo]
+abort('[generate] set PRT_GH_REPO to the repo on GitHub, as owner/name') unless GH_REPO
+opts[:repo] = File.expand_path(opts[:repo])
+$prt_lang = opts[:lang].to_s.empty? ? 'en' : opts[:lang]
+$prt_suffix = $prt_lang == 'en' ? '' : ".#{$prt_lang}"
+
+cache = File.join(ROOT, '.cache', pr_number)
+FileUtils.mkdir_p(cache)
+FileUtils.mkdir_p(opts[:out])
+
+pr_path = File.join(cache, 'pr.json')
+diff_path = File.join(cache, 'diff.patch')
+if opts[:offline] && File.exist?(pr_path) && File.exist?(diff_path)
+  log 'offline: using cached PR metadata and diff'
+  pr = JSON.parse(File.read(pr_path))
+  patch = File.read(diff_path)
+else
+  log 'fetching PR metadata and diff'
+  pr = JSON.parse(run!(['gh', 'pr', 'view', pr_number, '--repo', GH_REPO, '--json',
+                        'number,title,body,headRefOid,headRefName,baseRefName,files,url,author']))
+  File.write(pr_path, JSON.pretty_generate(pr))
+  patch = run!(['gh', 'pr', 'diff', pr_number, '--repo', GH_REPO])
+  File.write(diff_path, patch)
+end
+
+sha = pr['headRefOid']
+hunks = parse_hunks(patch)
+log "#{pr['files'].size} files, #{hunks.size} hunks, head #{sha[0, 10]}"
+
+worktree = ensure_worktree(opts[:repo], pr_number, sha, pr['headRefName'])
+prompt = build_prompt(pr, hunks, sha)
+File.write(File.join(cache, "prompt#{$prt_suffix}.md"), prompt)
+
+if opts[:dry_run]
+  puts prompt
+  exit 0
+end
+
+trace = if opts[:from_trace]
+          log "re-rendering from #{opts[:from_trace]}"
+          JSON.parse(File.read(opts[:from_trace]))
+        else
+          t = run_claude(prompt, worktree, opts[:model], opts[:effort], opts[:max_turns], cache)
+          File.write(File.join(cache, "trace_raw#{$prt_suffix}.json"), JSON.pretty_generate(t))
+          t
+        end
+
+repo_url = pr['url'].to_s.sub(%r{/pull/\d+.*\z}, '')
+files_url = "#{pr['url']}/files"
+hunks.each { |h| h['github_url'] = hunk_github_url(files_url, h) }
+hunks_by_id = hunks.each_with_object({}) { |h, m| m[h['id']] = h }
+trace['pr'] = {
+  'number' => pr['number'], 'title' => pr['title'], 'url' => pr['url'],
+  'repo_url' => repo_url, 'files_url' => files_url,
+  'author' => pr.dig('author', 'login'), 'base' => pr['baseRefName'], 'head' => pr['headRefName'],
+  'sha' => sha, 'files' => pr['files'].map { |f| f['path'] }
+}
+trace['steps'] = Array(trace['steps']).select { |s| s.is_a?(Hash) }
+trace['branches'] = Array(trace['branches']).select { |b| b.is_a?(Hash) }
+trace['steps'].each { |s| enrich_step!(s, hunks_by_id, worktree) }
+trace['branches'].each do |b|
+  b['id'] = b['id'].to_s
+  b['from_step'] = b['from_step'].to_s
+  b['steps'] = Array(b['steps']).select { |s| s.is_a?(Hash) }
+  b['steps'].each { |s| enrich_step!(s, hunks_by_id, worktree) }
+end
+
+id_map = {}
+per_step = Hash.new(0)
+trace['branches'].each do |b|
+  from = b['from_step'].to_s
+  per_step[from] += 1
+  new_id = "#{from}#{('a'.ord + per_step[from]).chr}"
+  id_map[b['id']] ||= new_id
+  b['id'] = new_id
+  b['steps'].each_with_index { |s, i| s['id'] = "#{new_id}#{i + 1}" }
+end
+all_steps = trace['steps'] + trace['branches'].flat_map { |b| b['steps'] }
+all_steps.each do |s|
+  s['error_branches'].each { |e| e['goto'] = id_map.fetch(e['goto'], e['goto']) if e['goto'] }
+end
+assign_identity!(trace)
+used_hunks = all_steps.flat_map { |s| s['hunks'] + Array(s.dig('spec_coverage', 'hunks')) }.uniq
+pe = trace['plain_english'].is_a?(Hash) ? trace['plain_english'] : {}
+trace['plain_english'] = {
+  'purpose' => pe['purpose'].to_s,
+  'approach' => pe['approach'].to_s,
+  'walkthrough' => Array(pe['walkthrough']).map(&:to_s),
+  'watch_out' => Array(pe['watch_out']).map(&:to_s)
+}
+trace['meta'] = (trace['meta'] || {}).merge(
+  'generated_at' => Time.now.iso8601,
+  'generator' => 'pr-review-tool/bin/generate',
+  'unused_hunks' => hunks.map { |h| h['id'] } - used_hunks
+)
+unverified = all_steps.sum { |s| s['unverified'].size }
+trace['meta']['relevance_counts'] = %w[changed affected context].each_with_object({}) do |r, h|
+  h[r] = trace['steps'].count { |s| s['relevance'] == r }
+end
+
+trace['meta']['lang'] ||= $prt_lang
+File.write(File.join(opts[:out], "trace-#{pr_number}#{$prt_suffix}.json"), JSON.pretty_generate(trace))
+html_path = File.join(opts[:out], "walkthrough-#{pr_number}#{$prt_suffix}.html")
+render_html(trace, html_path)
+
+log "steps #{trace['steps'].size} (#{trace['meta']['relevance_counts'].map { |k, v| "#{v} #{k}" }.join(', ')}), branches #{trace['branches'].size}, unverified refs #{unverified}, unused hunks: #{trace['meta']['unused_hunks'].empty? ? 'none' : trace['meta']['unused_hunks'].join(',')}"
+rows = trace['identity']['rows']
+log "rows #{rows.size} (#{rows.values.count { |r| r['is_new'] }} new, #{rows.values.sum { |r| r['events'].size }} changes, #{trace['steps'].sum { |s| s['state_after']['records'].count { |r| r['row_guessed'] } }} guessed names), jobs #{trace['identity']['jobs'].size}"
+log "wrote #{html_path}"
+puts html_path
